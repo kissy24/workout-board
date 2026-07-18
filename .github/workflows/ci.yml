@@ -33,6 +33,15 @@ jobs:
       - name: Scan Bun dependencies
         run: bun pm scan
 
+  dependencies:
+    name: Scan source dependencies with OSV
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
       - name: Scan source dependencies with OSV
         uses: google/osv-scanner-action/osv-scanner-action@40a8940a65eab1544a6af759e43d936201a131a2 # v2.0.3
         with:
