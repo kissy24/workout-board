@@ -20,11 +20,9 @@
       <div class="topbar-actions">
         <span id="demo-badge" class="badge hidden">DEMO</span>
         <span id="sync-status" class="sync-status">未取り込み</span>
-        <button id="sync-button" class="icon-button" type="button" title="新しいファイルを取り込む" aria-label="新しいファイルを取り込む">
-          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12m-4-4 4 4 4-4M5 20h14" /></svg>
-        </button>
-        <button id="settings-button" class="icon-button" type="button" title="設定" aria-label="設定">
-          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7Z"/><path d="m19.4 15 .1.1 1.3 2.2-2.5 2.5-2.2-1.3-.1-.1a8 8 0 0 1-2 .8V22h-4v-2.8a8 8 0 0 1-2-.8l-.1.1-2.2 1.3-2.5-2.5 1.3-2.2.1-.1a8 8 0 0 1-.8-2H1v-4h2.8a8 8 0 0 1 .8-2l-.1-.1-1.3-2.2 2.5-2.5 2.2 1.3.1.1a8 8 0 0 1 2-.8V2h4v2.8a8 8 0 0 1 2 .8l.1-.1 2.2-1.3 2.5 2.5-1.3 2.2-.1.1a8 8 0 0 1 .8 2H23v4h-2.8a8 8 0 0 1-.8 2Z"/></svg>
+        <button id="settings-button" class="data-button" type="button" title="取込データを管理する">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v11m-4-4 4 4 4-4M5 19h14" /></svg>
+          <span>データ管理</span>
         </button>
       </div>
     </header>
@@ -39,9 +37,9 @@
         <fieldset class="filters" aria-label="表示フィルター">
           <label>期間
             <select id="period-select">
-              <option value="30">直近30日</option>
-              <option value="90" selected>直近90日</option>
-              <option value="180">直近180日</option>
+              <option value="30">直近1ヶ月</option>
+              <option value="90">直近3ヶ月</option>
+              <option value="180" selected>直近6ヶ月</option>
               <option value="all">全期間</option>
             </select>
           </label>
@@ -80,7 +78,39 @@
               <title id="chart-title">トレーニング成長推移</title>
               <desc id="chart-desc">選択した期間の指標を日付順に示します。</desc>
             </svg>
+            <div id="chart-tooltip" class="chart-tooltip" role="tooltip"></div>
             <p id="chart-empty" class="chart-empty hidden">この条件の記録はありません。</p>
+          </div>
+        </section>
+
+        <section id="exercise-progress" class="panel chart-panel exercise-progress-panel" aria-labelledby="exercise-progress-title">
+          <div class="panel-heading exercise-progress-heading">
+            <div><p class="eyebrow">EXERCISE PROGRESS</p><h2 id="exercise-progress-title">種目ごとの推移</h2></div>
+            <div class="exercise-progress-controls">
+              <label class="inline-select">種目
+                <select id="exercise-trend-select" aria-label="推移を見る種目"></select>
+              </label>
+              <fieldset id="exercise-metric-tabs" class="segmented" aria-label="種目グラフ指標">
+                <button type="button" data-metric="topWeightKg" class="active">最高重量</button>
+                <button type="button" data-metric="estimatedOneRepMaxKg">推定1RM</button>
+                <button type="button" data-metric="volumeKg">ボリューム</button>
+              </fieldset>
+            </div>
+          </div>
+          <div class="exercise-progress-body">
+            <aside class="progress-stats" aria-label="選択した種目のサマリー">
+              <div><span>最新重量</span><strong id="exercise-latest-weight">—</strong></div>
+              <div><span>期間ベスト</span><strong id="exercise-best-weight">—</strong></div>
+              <div><span>トレーニング日数</span><strong id="exercise-session-count">—</strong></div>
+            </aside>
+            <div class="chart-wrap exercise-chart-wrap">
+              <svg id="exercise-trend-chart" role="img" aria-labelledby="exercise-chart-title exercise-chart-desc" viewBox="0 0 960 320">
+                <title id="exercise-chart-title">種目別の成長推移</title>
+                <desc id="exercise-chart-desc">選択した種目の指標を日付順に示します。</desc>
+              </svg>
+              <div id="exercise-chart-tooltip" class="chart-tooltip" role="tooltip"></div>
+              <p id="exercise-chart-empty" class="chart-empty hidden">この期間の記録はありません。</p>
+            </div>
           </div>
         </section>
 
