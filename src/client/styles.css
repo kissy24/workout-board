@@ -25,6 +25,24 @@ body {
   min-width: 320px;
   background: var(--paper);
   color: var(--ink);
+  position: relative;
+  isolation: isolate;
+}
+body::before {
+  content: "";
+  position: fixed;
+  z-index: -1;
+  width: min(52vw, 720px);
+  aspect-ratio: 1;
+  top: -32vw;
+  right: -16vw;
+  border-radius: 50%;
+  background: radial-gradient(
+    circle,
+    color-mix(in srgb, var(--lime) 18%, transparent),
+    transparent 68%
+  );
+  pointer-events: none;
 }
 button,
 input,
@@ -119,29 +137,42 @@ button {
   color: var(--muted);
   margin-right: 8px;
 }
-.icon-button {
-  display: grid;
-  place-items: center;
-  width: 40px;
+.data-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
   height: 40px;
-  border: 1px solid var(--line);
-  border-radius: 12px;
-  background: var(--surface);
-  color: var(--ink);
+  padding: 0 14px;
+  border: 1px solid var(--dark);
+  border-radius: 999px;
+  background: var(--dark);
+  color: white;
+  font-size: 11px;
+  font-weight: 800;
+  transition:
+    transform 180ms ease,
+    box-shadow 180ms ease,
+    background-color 180ms ease;
 }
-.icon-button:hover {
-  border-color: var(--ink);
-  transform: translateY(-1px);
+.data-button:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 9px 24px rgba(25, 35, 31, 0.2);
+  background: color-mix(in srgb, var(--dark) 88%, var(--lime));
 }
-.icon-button svg {
-  width: 18px;
+.data-button:disabled {
+  cursor: wait;
+  opacity: 0.68;
+}
+.data-button svg {
+  width: 16px;
   fill: none;
   stroke: currentColor;
   stroke-width: 1.8;
   stroke-linecap: round;
   stroke-linejoin: round;
 }
-.icon-button.loading svg {
+.data-button.loading svg {
   animation: spin 0.8s linear infinite;
 }
 @keyframes spin {
@@ -161,6 +192,9 @@ button {
   align-items: end;
   gap: 32px;
   margin-bottom: 34px;
+}
+.hero > div {
+  animation: rise-in 620ms cubic-bezier(0.2, 0.75, 0.25, 1) both;
 }
 .eyebrow {
   margin: 0 0 8px;
@@ -190,6 +224,8 @@ h1 em::after {
   background: var(--lime);
   z-index: -1;
   transform: rotate(-1.5deg);
+  transform-origin: left;
+  animation: marker-in 700ms 260ms cubic-bezier(0.2, 0.75, 0.25, 1) both;
 }
 .date-range {
   color: var(--muted);
@@ -202,6 +238,7 @@ h1 em::after {
   margin: 0;
   padding: 0;
   border: 0;
+  animation: rise-in 620ms 80ms cubic-bezier(0.2, 0.75, 0.25, 1) both;
 }
 .filters label,
 .sheet-choice label {
@@ -231,6 +268,21 @@ button:focus-visible {
   display: grid;
   gap: 22px;
 }
+.dashboard > * {
+  animation: rise-in 560ms cubic-bezier(0.2, 0.75, 0.25, 1) both;
+}
+.dashboard > :nth-child(2) {
+  animation-delay: 70ms;
+}
+.dashboard > :nth-child(3) {
+  animation-delay: 130ms;
+}
+.dashboard > :nth-child(4) {
+  animation-delay: 190ms;
+}
+.dashboard > :nth-child(5) {
+  animation-delay: 250ms;
+}
 .kpi-grid {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
@@ -245,6 +297,15 @@ button:focus-visible {
   box-shadow: var(--shadow);
   position: relative;
   overflow: hidden;
+  transition:
+    transform 220ms ease,
+    box-shadow 220ms ease,
+    border-color 220ms ease;
+}
+.kpi-card:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 24px 60px rgba(30, 41, 35, 0.14);
+  border-color: color-mix(in srgb, var(--lime-deep) 38%, var(--line));
 }
 .kpi-card::after {
   content: "";
@@ -303,6 +364,13 @@ button:focus-visible {
   border: 1px solid var(--line);
   border-radius: 18px;
   box-shadow: var(--shadow);
+  transition:
+    box-shadow 240ms ease,
+    border-color 240ms ease;
+}
+.panel:hover {
+  border-color: color-mix(in srgb, var(--lime-deep) 22%, var(--line));
+  box-shadow: 0 22px 65px rgba(30, 41, 35, 0.11);
 }
 .panel-heading {
   min-height: 88px;
@@ -334,6 +402,14 @@ button:focus-visible {
   color: var(--muted);
   font-size: 11px;
   font-weight: 700;
+  transition:
+    color 160ms ease,
+    background-color 160ms ease,
+    transform 160ms ease;
+}
+.segmented button:hover:not(.active) {
+  color: var(--ink);
+  transform: translateY(-1px);
 }
 .segmented button.active {
   background: var(--dark);
@@ -359,6 +435,7 @@ button:focus-visible {
 }
 .chart-area {
   fill: color-mix(in srgb, var(--lime) 20%, transparent);
+  opacity: 0;
 }
 .chart-line {
   fill: none;
@@ -366,11 +443,140 @@ button:focus-visible {
   stroke-width: 3.5;
   stroke-linejoin: round;
   stroke-linecap: round;
+  stroke-dasharray: 1800;
+  stroke-dashoffset: 1800;
 }
 .chart-point {
   fill: var(--surface);
   stroke: var(--lime-deep);
   stroke-width: 3;
+  opacity: 0;
+  transform-box: fill-box;
+  transform-origin: center;
+}
+.chart-ready .chart-area {
+  animation: area-in 650ms 280ms ease-out forwards;
+}
+.chart-ready .chart-line {
+  animation: line-in 900ms cubic-bezier(0.2, 0.75, 0.25, 1) forwards;
+}
+.chart-ready .chart-point {
+  animation: point-in 300ms 300ms ease-out forwards;
+}
+.chart-point:hover,
+.chart-point:focus {
+  fill: var(--lime);
+  outline: none;
+}
+.chart-tooltip {
+  position: absolute;
+  z-index: 3;
+  width: 190px;
+  padding: 12px 14px;
+  border: 1px solid color-mix(in srgb, var(--lime) 28%, var(--line));
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--dark) 94%, transparent);
+  color: white;
+  box-shadow: 0 14px 35px rgba(9, 16, 12, 0.28);
+  opacity: 0;
+  pointer-events: none;
+  transform: translate(-50%, calc(-100% - 12px)) scale(0.96);
+  transform-origin: bottom center;
+  transition:
+    opacity 140ms ease,
+    transform 140ms ease;
+}
+.chart-tooltip.visible {
+  opacity: 1;
+  transform: translate(-50%, calc(-100% - 12px)) scale(1);
+}
+.chart-tooltip::after {
+  content: "";
+  position: absolute;
+  top: 100%;
+  left: calc(50% + var(--tip-offset, 0px));
+  width: 9px;
+  height: 9px;
+  background: var(--dark);
+  transform: translate(-50%, -5px) rotate(45deg);
+}
+.chart-tooltip strong {
+  display: block;
+  margin-bottom: 9px;
+  color: var(--lime);
+  font-size: 11px;
+}
+.chart-tooltip dl {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 5px 12px;
+  margin: 0;
+  font-size: 10px;
+}
+.chart-tooltip dt {
+  color: rgba(255, 255, 255, 0.62);
+}
+.chart-tooltip dd {
+  margin: 0;
+  font-weight: 700;
+  text-align: right;
+}
+.chart-tooltip .active {
+  color: var(--lime);
+}
+.exercise-progress-heading {
+  align-items: end;
+}
+.exercise-progress-controls {
+  display: flex;
+  align-items: end;
+  gap: 12px;
+}
+.inline-select {
+  display: grid;
+  gap: 5px;
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 800;
+}
+.inline-select select {
+  min-width: 190px;
+}
+.exercise-progress-body {
+  display: grid;
+  grid-template-columns: 210px minmax(0, 1fr);
+}
+.progress-stats {
+  display: grid;
+  align-content: center;
+  gap: 0;
+  padding: 24px 0 24px 26px;
+  border-right: 1px solid var(--line);
+}
+.progress-stats > div {
+  padding: 18px 20px 18px 0;
+  border-bottom: 1px solid var(--line);
+}
+.progress-stats > div:last-child {
+  border-bottom: 0;
+}
+.progress-stats span,
+.progress-stats strong {
+  display: block;
+}
+.progress-stats span {
+  margin-bottom: 7px;
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+}
+.progress-stats strong {
+  font-size: 23px;
+  letter-spacing: -0.04em;
+}
+.exercise-chart-wrap {
+  min-width: 0;
 }
 .chart-empty {
   position: absolute;
@@ -414,6 +620,33 @@ td {
 td:first-child {
   font-weight: 700;
   white-space: normal;
+}
+.exercise-link {
+  padding: 2px 0;
+  border: 0;
+  border-bottom: 1px solid transparent;
+  background: transparent;
+  color: var(--ink);
+  font-weight: 800;
+  text-align: left;
+  transition:
+    color 160ms ease,
+    border-color 160ms ease;
+}
+.exercise-link::after {
+  content: "↗";
+  display: inline-block;
+  margin-left: 7px;
+  color: var(--lime-deep);
+  font-size: 11px;
+  transition: transform 160ms ease;
+}
+.exercise-link:hover {
+  color: var(--lime-deep);
+  border-color: currentColor;
+}
+.exercise-link:hover::after {
+  transform: translate(2px, -2px);
 }
 .note-list {
   list-style: none;
@@ -549,6 +782,9 @@ dialog {
   background: var(--surface);
   color: var(--ink);
   box-shadow: 0 30px 100px rgba(15, 24, 19, 0.35);
+}
+dialog[open] {
+  animation: dialog-in 240ms cubic-bezier(0.2, 0.75, 0.25, 1) both;
 }
 dialog::backdrop {
   background: rgba(13, 20, 16, 0.62);
@@ -720,6 +956,47 @@ dialog::backdrop {
   background: var(--danger);
 }
 
+@keyframes rise-in {
+  from {
+    opacity: 0;
+    transform: translateY(18px);
+  }
+}
+@keyframes marker-in {
+  from {
+    transform: scaleX(0) rotate(-1.5deg);
+  }
+  to {
+    transform: scaleX(1) rotate(-1.5deg);
+  }
+}
+@keyframes line-in {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+@keyframes area-in {
+  to {
+    opacity: 1;
+  }
+}
+@keyframes point-in {
+  from {
+    opacity: 0;
+    transform: scale(0.3);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+@keyframes dialog-in {
+  from {
+    opacity: 0;
+    transform: translateY(12px) scale(0.98);
+  }
+}
+
 @media (max-width: 900px) {
   .kpi-grid {
     grid-template-columns: repeat(2, 1fr);
@@ -731,6 +1008,28 @@ dialog::backdrop {
     align-items: start;
     flex-direction: column;
   }
+  .exercise-progress-heading,
+  .exercise-progress-controls {
+    align-items: stretch;
+    flex-direction: column;
+  }
+  .exercise-progress-body {
+    grid-template-columns: 1fr;
+  }
+  .progress-stats {
+    grid-template-columns: repeat(3, 1fr);
+    padding: 0 20px;
+    border-right: 0;
+    border-bottom: 1px solid var(--line);
+  }
+  .progress-stats > div {
+    border-right: 1px solid var(--line);
+    border-bottom: 0;
+    padding: 18px;
+  }
+  .progress-stats > div:last-child {
+    border-right: 0;
+  }
 }
 @media (max-width: 600px) {
   .topbar {
@@ -739,6 +1038,17 @@ dialog::backdrop {
   }
   .sync-status {
     display: none;
+  }
+  .data-button {
+    width: 40px;
+    padding: 0;
+  }
+  .data-button span {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
   }
   .container {
     width: min(100% - 28px, 1240px);
@@ -779,6 +1089,19 @@ dialog::backdrop {
   .segmented button {
     flex: 1;
     padding-inline: 5px;
+  }
+  .exercise-progress-controls,
+  .inline-select select {
+    width: 100%;
+  }
+  .progress-stats {
+    padding-inline: 10px;
+  }
+  .progress-stats > div {
+    padding: 14px 9px;
+  }
+  .progress-stats strong {
+    font-size: 18px;
   }
   .chart-wrap {
     min-height: 240px;
@@ -831,6 +1154,25 @@ dialog::backdrop {
   *::after {
     scroll-behavior: auto;
     animation-duration: 0.01ms;
+  }
+  .hero > div,
+  .filters,
+  .dashboard > *,
+  h1 em::after,
+  .chart-ready .chart-area,
+  .chart-ready .chart-line,
+  .chart-ready .chart-point,
+  dialog[open] {
+    animation-delay: 0ms;
+    animation-duration: 0.01ms;
+    transition-duration: 0.01ms;
+  }
+  .chart-line {
+    stroke-dashoffset: 0;
+  }
+  .chart-area,
+  .chart-point {
+    opacity: 1;
   }
 }
 
