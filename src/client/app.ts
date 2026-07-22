@@ -1,4 +1,4 @@
-import type { DashboardSummary, ImportedFile, TrendPoint } from "../lib/types";
+import type { DashboardSummary, ImportedFile, SessionExercise } from "../lib/types";
 
 interface BootstrapState {
   csrfToken: string;
@@ -13,7 +13,13 @@ interface ImportResult {
   warningCount: number;
 }
 
-type ChartMetric = "volumeKg" | "topWeightKg" | "estimatedOneRepMaxKg";
+type WorkoutSet = SessionExercise["sets"][number];
+
+interface TopSetPoint {
+  date: string;
+  topSet: WorkoutSet;
+  sets: WorkoutSet[];
+}
 
 const elements = {
   dashboard: query<HTMLElement>("#dashboard"),
@@ -33,16 +39,12 @@ const elements = {
   dangerActions: query<HTMLElement>("#danger-actions"),
   resetButton: query<HTMLButtonElement>("#reset-button"),
   toast: query<HTMLElement>("#toast"),
-  chart: query<SVGSVGElement>("#trend-chart"),
+  chart: query<SVGSVGElement>("#progress-chart"),
   chartEmpty: query<HTMLElement>("#chart-empty"),
   chartTooltip: query<HTMLElement>("#chart-tooltip"),
-  exerciseTrendSelect: query<HTMLSelectElement>("#exercise-trend-select"),
-  exerciseChart: query<SVGSVGElement>("#exercise-trend-chart"),
-  exerciseChartEmpty: query<HTMLElement>("#exercise-chart-empty"),
-  exerciseChartTooltip: query<HTMLElement>("#exercise-chart-tooltip"),
-  exerciseLatestWeight: query<HTMLElement>("#exercise-latest-weight"),
-  exerciseBestWeight: query<HTMLElement>("#exercise-best-weight"),
-  exerciseSessionCount: query<HTMLElement>("#exercise-session-count"),
+  exerciseLatestSet: query<HTMLElement>("#exercise-latest-set"),
+  exerciseBestSet: query<HTMLElement>("#exercise-best-set"),
+  exerciseWeightChange: query<HTMLElement>("#exercise-weight-change"),
   exerciseTable: query<HTMLTableSectionElement>("#exercise-table"),
   noteList: query<HTMLUListElement>("#note-list"),
   historyList: query<HTMLElement>("#history-list"),
@@ -53,9 +55,6 @@ const elements = {
 
 let bootstrapState: BootstrapState;
 let summary: DashboardSummary | null = null;
-let exerciseProgressSummary: DashboardSummary | null = null;
-let chartMetric: ChartMetric = "volumeKg";
-let exerciseChartMetric: ChartMetric = "topWeightKg";
 let toastTimer: number | null = null;
 
 void initialize();
@@ -82,31 +81,14 @@ function attachListeners(): void {
   elements.settingsButton.addEventListener("click", openSettings);
   elements.emptySettingsButton.addEventListener("click", openSettings);
   elements.periodSelect.addEventListener("change", () => void loadDashboard());
-  elements.exerciseSelect.addEventListener("change", () => void loadDashboard());
-  elements.exerciseTrendSelect.addEventListener("change", renderExerciseProgress);
+  elements.exerciseSelect.addEventListener("change", renderExerciseProgress);
   elements.chooseFileButton.addEventListener("click", requestFileSelection);
   elements.importFile.addEventListener("change", () => void importFile());
   elements.resetButton.addEventListener("click", () => void resetSettings());
-  query<HTMLElement>("#metric-tabs").addEventListener("click", (event) => {
-    const button = (event.target as Element).closest<HTMLButtonElement>("button[data-metric]");
-    if (!button) return;
-    chartMetric = button.dataset.metric as ChartMetric;
-    for (const item of document.querySelectorAll("#metric-tabs button"))
-      item.classList.toggle("active", item === button);
-    if (summary) drawChart(summary.trends);
-  });
-  query<HTMLElement>("#exercise-metric-tabs").addEventListener("click", (event) => {
-    const button = (event.target as Element).closest<HTMLButtonElement>("button[data-metric]");
-    if (!button) return;
-    exerciseChartMetric = button.dataset.metric as ChartMetric;
-    for (const item of document.querySelectorAll("#exercise-metric-tabs button"))
-      item.classList.toggle("active", item === button);
-    renderExerciseProgress();
-  });
   elements.exerciseTable.addEventListener("click", (event) => {
     const button = (event.target as Element).closest<HTMLButtonElement>("button[data-exercise]");
-    if (!button?.dataset.exercise || !exerciseProgressSummary) return;
-    elements.exerciseTrendSelect.value = button.dataset.exercise;
+    if (!button?.dataset.exercise || !summary) return;
+    elements.exerciseSelect.value = button.dataset.exercise;
     renderExerciseProgress();
     query<HTMLElement>("#exercise-progress").scrollIntoView({
       behavior: "smooth",
@@ -177,24 +159,13 @@ async function importFile(): Promise<void> {
 
 async function loadDashboard(): Promise<void> {
   const queryString = new URLSearchParams({ period: elements.periodSelect.value });
-  if (elements.exerciseSelect.value) queryString.set("exercise", elements.exerciseSelect.value);
-  const allQueryString = new URLSearchParams({ period: elements.periodSelect.value });
-  const [dashboardData, allExerciseData] = await Promise.all([
-    get<DashboardSummary>(`/api/dashboard?${queryString}`),
-    elements.exerciseSelect.value
-      ? get<DashboardSummary>(`/api/dashboard?${allQueryString}`)
-      : Promise.resolve(null),
-  ]);
-  summary = dashboardData;
-  exerciseProgressSummary = allExerciseData ?? dashboardData;
+  summary = await get<DashboardSummary>(`/api/dashboard?${queryString}`);
   renderDashboard(summary);
-  renderExerciseProgress();
 }
 
 function renderDashboard(data: DashboardSummary): void {
   elements.emptyState.classList.add("hidden");
   elements.dashboard.classList.remove("hidden");
-  updateExerciseOptions(data.availableExercises, data.exercise);
   elements.dateRange.textContent =
     data.range.start && data.range.end
       ? `${formatDate(data.range.start)} — ${formatDate(data.range.end)}`
@@ -202,93 +173,118 @@ function renderDashboard(data: DashboardSummary): void {
   elements.syncStatus.textContent = data.lastSyncedAt
     ? `最終取込 ${new Intl.DateTimeFormat("ja-JP", { hour: "2-digit", minute: "2-digit" }).format(new Date(data.lastSyncedAt))}`
     : "未取り込み";
-  setMetric(
-    "volume",
-    `${formatNumber(data.kpis.totalVolumeKg.value)} kg`,
-    data.kpis.totalVolumeKg.percentChange,
-  );
-  setMetric(
-    "sessions",
-    `${formatNumber(data.kpis.sessionCount.value)} 日`,
-    data.kpis.sessionCount.percentChange,
-  );
-  setMetric(
-    "sets",
-    `${formatNumber(data.kpis.setCount.value)} sets`,
-    data.kpis.setCount.percentChange,
-  );
-  setMetric(
-    "one-rm",
-    `${formatDecimal(data.kpis.estimatedOneRepMaxKg.value)} kg`,
-    data.kpis.estimatedOneRepMaxKg.percentChange,
-  );
-  drawChart(data.trends);
+
+  renderInsights(data);
+  updateExerciseOptions(data);
+  renderExerciseProgress();
   renderExercises(data);
   renderNotes(data);
   renderHistory(data);
   renderWarnings(data);
 }
 
-function updateExerciseOptions(exercises: string[], selected: string | null): void {
-  const current = selected ?? elements.exerciseSelect.value;
+function renderInsights(data: DashboardSummary): void {
+  const insights = data.insights;
+  query<HTMLElement>("#insight-last").textContent =
+    insights.daysSinceLastWorkout === null
+      ? "—"
+      : insights.daysSinceLastWorkout === 0
+        ? "今日"
+        : `${insights.daysSinceLastWorkout}日前`;
+  query<HTMLElement>("#insight-last-detail").textContent = insights.lastWorkoutDate
+    ? formatDate(insights.lastWorkoutDate)
+    : "記録なし";
+  query<HTMLElement>("#insight-frequency").textContent =
+    `${formatDecimal(insights.weeklyFrequency)} 回`;
+  query<HTMLElement>("#insight-streak").textContent = `${insights.activeWeekStreak} 週`;
+  query<HTMLElement>("#insight-pr").textContent = `${insights.personalRecordExerciseCount} 種目`;
+}
+
+function updateExerciseOptions(data: DashboardSummary): void {
+  const current = data.exercises.some(
+    (exercise) => exercise.exercise === elements.exerciseSelect.value,
+  )
+    ? elements.exerciseSelect.value
+    : (data.exercises[0]?.exercise ?? "");
   elements.exerciseSelect.replaceChildren(
-    option("", "すべての種目", current === ""),
-    ...exercises.map((exercise) => option(exercise, exercise, exercise === current)),
+    ...data.exercises.map((exercise) =>
+      option(exercise.exercise, exercise.exercise, exercise.exercise === current),
+    ),
   );
+  elements.exerciseSelect.disabled = data.exercises.length === 0;
 }
 
-function setMetric(id: string, value: string, change: number | null): void {
-  query<HTMLElement>(`#kpi-${id}`).textContent = value;
-  const changeElement = query<HTMLElement>(`#change-${id}`);
-  changeElement.className = change === null ? "" : change >= 0 ? "positive" : "negative";
-  changeElement.textContent =
-    change === null
-      ? "比較データなし"
-      : `${change >= 0 ? "↗" : "↘"} ${Math.abs(change).toFixed(1)}% 前期間比`;
-}
-
-function drawChart(trends: TrendPoint[]): void {
-  drawLineChart(
-    elements.chart,
-    elements.chartEmpty,
-    elements.chartTooltip,
-    trends,
-    chartMetric,
-    "全体の成長推移",
+function renderExerciseProgress(): void {
+  if (!summary) return;
+  const exerciseName = elements.exerciseSelect.value;
+  const points = exerciseName ? buildTopSetPoints(summary, exerciseName) : [];
+  const latest = points.at(-1);
+  const first = points[0];
+  const best = points.reduce<TopSetPoint | null>(
+    (current, point) =>
+      !current || betterWorkoutSet(point.topSet, current.topSet) === point.topSet ? point : current,
+    null,
   );
+
+  elements.exerciseLatestSet.textContent = latest ? formatSet(latest.topSet) : "—";
+  elements.exerciseBestSet.textContent = best ? formatSet(best.topSet) : "—";
+  if (!first || !latest) {
+    elements.exerciseWeightChange.textContent = "—";
+    elements.exerciseWeightChange.className = "summary-value";
+  } else {
+    const change = latest.topSet.weightKg - first.topSet.weightKg;
+    elements.exerciseWeightChange.textContent = `${change > 0 ? "+" : ""}${formatDecimal(change)} kg`;
+    elements.exerciseWeightChange.className = `summary-value${change > 0 ? " positive" : change < 0 ? " negative" : ""}`;
+  }
+  drawChart(points, exerciseName);
 }
 
-function drawLineChart(
-  svg: SVGSVGElement,
-  emptyElement: HTMLElement,
-  tooltip: HTMLElement,
-  trends: TrendPoint[],
-  metric: ChartMetric,
-  labelPrefix: string,
-): void {
+function buildTopSetPoints(data: DashboardSummary, exerciseName: string): TopSetPoint[] {
+  return data.sessions
+    .flatMap((session) => {
+      const exercise = session.exercises.find((item) => item.exercise === exerciseName);
+      if (!exercise || exercise.sets.length === 0) return [];
+      return [
+        {
+          date: session.date,
+          topSet: exercise.sets.reduce(betterWorkoutSet),
+          sets: exercise.sets,
+        },
+      ];
+    })
+    .sort((a, b) => a.date.localeCompare(b.date));
+}
+
+function betterWorkoutSet(a: WorkoutSet, b: WorkoutSet): WorkoutSet {
+  if (a.weightKg !== b.weightKg) return a.weightKg > b.weightKg ? a : b;
+  if (a.reps !== b.reps) return a.reps > b.reps ? a : b;
+  return a.set < b.set ? a : b;
+}
+
+function drawChart(points: TopSetPoint[], exerciseName: string): void {
+  const svg = elements.chart;
   const title = svg.querySelector("title") ?? svgElement("title");
-  title.textContent = `${labelPrefix}: ${metricLabel(metric)}`;
+  title.textContent = `${exerciseName || "種目"}のトップセット推移`;
   const description = svg.querySelector("desc") ?? svgElement("desc");
-  description.textContent = `${trends.length}回の記録を日付順に表示しています。`;
+  description.textContent = `${points.length}回のトップセットを日付順に表示しています。`;
   svg.replaceChildren(title, description);
-  hideChartTooltip(tooltip);
-  emptyElement.classList.toggle("hidden", trends.length > 0);
-  svg.classList.toggle("hidden", trends.length === 0);
-  if (trends.length === 0) return;
+  hideChartTooltip();
+  elements.chartEmpty.classList.toggle("hidden", points.length > 0);
+  svg.classList.toggle("hidden", points.length === 0);
+  if (points.length === 0) return;
 
   const width = 960;
   const height = 320;
-  const padding = { top: 26, right: 24, bottom: 48, left: 72 };
+  const padding = { top: 28, right: 28, bottom: 48, left: 68 };
   const plotWidth = width - padding.left - padding.right;
   const plotHeight = height - padding.top - padding.bottom;
-  const values = trends.map((point) => point[metric]);
-  const max = Math.max(...values, 1);
+  const max = Math.max(...points.map((point) => point.topSet.weightKg), 1);
   const roundedMax = niceMax(max);
-  const coordinates = trends.map((point, index) => ({
+  const coordinates = points.map((point, index) => ({
     x:
       padding.left +
-      (trends.length === 1 ? plotWidth / 2 : (index / (trends.length - 1)) * plotWidth),
-    y: padding.top + plotHeight - (point[metric] / roundedMax) * plotHeight,
+      (points.length === 1 ? plotWidth / 2 : (index / (points.length - 1)) * plotWidth),
+    y: padding.top + plotHeight - (point.topSet.weightKg / roundedMax) * plotHeight,
     point,
   }));
 
@@ -307,40 +303,32 @@ function drawLineChart(
       class: "chart-label",
       "text-anchor": "end",
     });
-    label.textContent = compactNumber(roundedMax * (1 - index / 4));
+    label.textContent = `${formatDecimal(roundedMax * (1 - index / 4))}`;
     svg.append(line, label);
   }
 
   const linePoints = coordinates.map(({ x, y }) => `${x},${y}`).join(" ");
-  const baseline = padding.top + plotHeight;
-  svg.append(
-    svgElement("polygon", {
-      points: `${coordinates[0]?.x},${baseline} ${linePoints} ${coordinates.at(-1)?.x},${baseline}`,
-      class: "chart-area",
-    }),
-    svgElement("polyline", { points: linePoints, class: "chart-line" }),
-  );
+  svg.append(svgElement("polyline", { points: linePoints, class: "chart-line" }));
 
-  const labelEvery = Math.max(1, Math.ceil(trends.length / 6));
+  const labelEvery = Math.max(1, Math.ceil(points.length / 6));
   coordinates.forEach(({ x, y, point }, index) => {
+    const hitTarget = svgElement("circle", { cx: x, cy: y, r: 14, class: "chart-hit" });
     const circle = svgElement("circle", {
       cx: x,
       cy: y,
-      r: 6,
+      r: 5,
       class: "chart-point",
       tabindex: 0,
     });
-    circle.style.animationDelay = `${Math.min(index * 45, 450)}ms`;
-    circle.setAttribute(
-      "aria-label",
-      `${formatDate(point.date)}、${metricLabel(metric)} ${formatDecimal(point[metric])} kg`,
-    );
-    const showTooltip = () => displayChartTooltip(svg, tooltip, x, y, point, metric);
-    circle.addEventListener("mouseenter", showTooltip);
+    circle.setAttribute("aria-label", `${formatDate(point.date)}、${formatSet(point.topSet)}`);
+    const showTooltip = () => displayChartTooltip(svg, x, y, point);
+    for (const target of [hitTarget, circle]) {
+      target.addEventListener("mouseenter", showTooltip);
+      target.addEventListener("mouseleave", hideChartTooltip);
+    }
     circle.addEventListener("focus", showTooltip);
-    circle.addEventListener("mouseleave", () => hideChartTooltip(tooltip));
-    circle.addEventListener("blur", () => hideChartTooltip(tooltip));
-    svg.append(circle);
+    circle.addEventListener("blur", hideChartTooltip);
+    svg.append(hitTarget, circle);
     if (index % labelEvery === 0 || index === coordinates.length - 1) {
       const label = svgElement("text", {
         x,
@@ -352,101 +340,47 @@ function drawLineChart(
       svg.append(label);
     }
   });
-  svg.classList.remove("chart-ready");
-  void svg.getBoundingClientRect();
-  svg.classList.add("chart-ready");
 }
 
-function renderExerciseProgress(): void {
-  const data = exerciseProgressSummary;
-  if (!data) return;
-  const exercises = data.exercises.map((exercise) => exercise.exercise);
-  const current = exercises.includes(elements.exerciseTrendSelect.value)
-    ? elements.exerciseTrendSelect.value
-    : (exercises[0] ?? "");
-  elements.exerciseTrendSelect.replaceChildren(
-    ...exercises.map((exercise) => option(exercise, exercise, exercise === current)),
-  );
-  elements.exerciseTrendSelect.disabled = exercises.length === 0;
-
-  const trends = current ? buildExerciseTrends(data, current) : [];
-  const latest = trends.at(-1);
-  const best = trends.reduce((value, point) => Math.max(value, point.topWeightKg), 0);
-  elements.exerciseLatestWeight.textContent = latest
-    ? `${formatDecimal(latest.topWeightKg)} kg`
-    : "—";
-  elements.exerciseBestWeight.textContent = best ? `${formatDecimal(best)} kg` : "—";
-  elements.exerciseSessionCount.textContent = trends.length ? `${trends.length} 日` : "—";
-  drawLineChart(
-    elements.exerciseChart,
-    elements.exerciseChartEmpty,
-    elements.exerciseChartTooltip,
-    trends,
-    exerciseChartMetric,
-    current || "種目別の成長推移",
-  );
-}
-
-function displayChartTooltip(
-  svg: SVGSVGElement,
-  tooltip: HTMLElement,
-  x: number,
-  y: number,
-  point: TrendPoint,
-  activeMetric: ChartMetric,
-): void {
+function displayChartTooltip(svg: SVGSVGElement, x: number, y: number, point: TopSetPoint): void {
   const date = document.createElement("strong");
   date.textContent = formatDate(point.date);
-  const metrics = document.createElement("dl");
-  for (const metric of [
-    "topWeightKg",
-    "estimatedOneRepMaxKg",
-    "volumeKg",
-  ] satisfies ChartMetric[]) {
-    const label = document.createElement("dt");
-    label.textContent = metricLabel(metric);
-    const value = document.createElement("dd");
-    value.textContent = `${formatDecimal(point[metric])} kg`;
-    if (metric === activeMetric) {
-      label.className = "active";
-      value.className = "active";
-    }
-    metrics.append(label, value);
+  const topSet = document.createElement("p");
+  topSet.className = "tooltip-top-set";
+  topSet.textContent = `トップセット  ${formatSet(point.topSet)}`;
+  const list = document.createElement("ul");
+  for (const set of point.sets.slice(0, 8)) {
+    const item = document.createElement("li");
+    item.textContent = `SET ${set.set}　${formatSet(set)}`;
+    list.append(item);
   }
-  tooltip.replaceChildren(date, metrics);
+  if (point.sets.length > 8) {
+    const remaining = document.createElement("li");
+    remaining.className = "tooltip-remaining";
+    remaining.textContent = `ほか ${point.sets.length - 8} セット`;
+    list.append(remaining);
+  }
+  elements.chartTooltip.replaceChildren(date, topSet, list);
+
   const svgRect = svg.getBoundingClientRect();
-  const parentRect = tooltip.parentElement?.getBoundingClientRect();
+  const parentRect = elements.chartTooltip.parentElement?.getBoundingClientRect();
   if (parentRect) {
     const anchorLeft = svgRect.left - parentRect.left + (x / 960) * svgRect.width;
-    const tooltipLeft = Math.min(Math.max(anchorLeft, 103), parentRect.width - 103);
-    tooltip.style.left = `${tooltipLeft}px`;
-    tooltip.style.top = `${svgRect.top - parentRect.top + (y / 320) * svgRect.height}px`;
-    tooltip.style.setProperty("--tip-offset", `${anchorLeft - tooltipLeft}px`);
+    const tooltipLeft = Math.min(Math.max(anchorLeft, 112), parentRect.width - 112);
+    const anchorTop = svgRect.top - parentRect.top + (y / 320) * svgRect.height;
+    elements.chartTooltip.style.left = `${tooltipLeft}px`;
+    elements.chartTooltip.style.top = `${anchorTop}px`;
+    elements.chartTooltip.style.setProperty("--tip-offset", `${anchorLeft - tooltipLeft}px`);
+    elements.chartTooltip.classList.toggle(
+      "below",
+      anchorTop < elements.chartTooltip.offsetHeight + 12,
+    );
   }
-  tooltip.classList.add("visible");
+  elements.chartTooltip.classList.add("visible");
 }
 
-function hideChartTooltip(tooltip: HTMLElement): void {
-  tooltip.classList.remove("visible");
-}
-
-function buildExerciseTrends(data: DashboardSummary, exerciseName: string): TrendPoint[] {
-  return data.sessions
-    .flatMap((session) => {
-      const exercise = session.exercises.find((item) => item.exercise === exerciseName);
-      if (!exercise || exercise.sets.length === 0) return [];
-      return [
-        {
-          date: session.date,
-          volumeKg: exercise.sets.reduce((sum, set) => sum + set.volumeKg, 0),
-          topWeightKg: Math.max(...exercise.sets.map((set) => set.weightKg)),
-          estimatedOneRepMaxKg: Math.max(
-            ...exercise.sets.map((set) => set.weightKg * (1 + set.reps / 30)),
-          ),
-        },
-      ];
-    })
-    .sort((a, b) => a.date.localeCompare(b.date));
+function hideChartTooltip(): void {
+  elements.chartTooltip.classList.remove("visible");
 }
 
 function renderExercises(data: DashboardSummary): void {
@@ -463,9 +397,9 @@ function renderExercises(data: DashboardSummary): void {
       exerciseCell.append(exerciseButton);
       row.append(
         exerciseCell,
-        cell(`${formatDecimal(exercise.topWeightKg)} kg`),
-        cell(`${formatDecimal(exercise.estimatedOneRepMaxKg)} kg`),
-        cell(`${formatNumber(exercise.totalVolumeKg)} kg`),
+        cell(formatDate(exercise.latestDate)),
+        cell(`${formatDecimal(exercise.bestSetWeightKg)} kg × ${exercise.bestSetReps}`),
+        cell(`${exercise.sessionCount} 日`),
       );
       return row;
     }),
@@ -516,9 +450,10 @@ function renderHistory(data: DashboardSummary): void {
       date.className = "session-date";
       const strong = document.createElement("strong");
       strong.textContent = formatDate(session.date);
-      const volume = document.createElement("span");
-      volume.textContent = `${formatNumber(session.totalVolumeKg)} kg volume`;
-      date.append(strong, volume);
+      const meta = document.createElement("span");
+      const setCount = session.exercises.reduce((sum, exercise) => sum + exercise.sets.length, 0);
+      meta.textContent = `${session.exercises.length}種目 · ${setCount}セット`;
+      date.append(strong, meta);
       const exercises = document.createElement("div");
       exercises.className = "session-exercises";
       for (const exercise of session.exercises) {
@@ -534,10 +469,7 @@ function renderHistory(data: DashboardSummary): void {
           chip.className = `set-chip${set.memo ? " has-memo" : ""}`;
           const index = document.createElement("b");
           index.textContent = `SET ${set.set}`;
-          chip.append(
-            index,
-            document.createTextNode(`${formatDecimal(set.weightKg)}kg × ${set.reps}`),
-          );
+          chip.append(index, document.createTextNode(formatSet(set)));
           wrapper.append(chip);
           if (set.memo) {
             const memo = document.createElement("p");
@@ -649,6 +581,10 @@ function query<T extends Element>(selector: string): T {
   return element;
 }
 
+function formatSet(set: Pick<WorkoutSet, "weightKg" | "reps">): string {
+  return `${formatDecimal(set.weightKg)} kg × ${set.reps}`;
+}
+
 function formatDate(date: string): string {
   return new Intl.DateTimeFormat("ja-JP", {
     year: "numeric",
@@ -673,29 +609,13 @@ function shortDate(date: string): string {
   );
 }
 
-function formatNumber(value: number): string {
-  return new Intl.NumberFormat("ja-JP", { maximumFractionDigits: 0 }).format(value);
-}
-
 function formatDecimal(value: number): string {
   return new Intl.NumberFormat("ja-JP", { maximumFractionDigits: 1 }).format(value);
-}
-
-function compactNumber(value: number): string {
-  return new Intl.NumberFormat("ja-JP", { notation: "compact", maximumFractionDigits: 1 }).format(
-    value,
-  );
 }
 
 function niceMax(value: number): number {
   const magnitude = 10 ** Math.floor(Math.log10(value));
   return Math.ceil(value / magnitude) * magnitude;
-}
-
-function metricLabel(metric: ChartMetric): string {
-  return { volumeKg: "ボリューム", topWeightKg: "最高重量", estimatedOneRepMaxKg: "推定1RM" }[
-    metric
-  ];
 }
 
 function messageFrom(error: unknown): string {

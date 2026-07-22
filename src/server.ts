@@ -69,14 +69,10 @@ async function routeRequest(request: Request): Promise<Response> {
   }
   if (request.method === "GET" && url.pathname === "/assets/app.js") {
     if (DEVELOPMENT_MODE) clientScript = await buildClientScript();
-    return secureResponse(
-      clientScript,
-      "text/javascript; charset=utf-8",
-      DEVELOPMENT_MODE ? "no-store" : "public, max-age=3600",
-    );
+    return secureResponse(clientScript, "text/javascript; charset=utf-8");
   }
   if (request.method === "GET" && url.pathname === "/assets/styles.css") {
-    return secureResponse(stylesheet, "text/css; charset=utf-8", "public, max-age=3600");
+    return secureResponse(stylesheet, "text/css; charset=utf-8");
   }
   if (request.method === "GET" && url.pathname === "/favicon.svg") {
     return secureResponse(favicon(), "image/svg+xml", "public, max-age=86400");
@@ -177,18 +173,12 @@ async function bootstrap(request: Request): Promise<Response> {
 }
 
 function dashboardResponse(url: URL): Response {
-  const periodValue = url.searchParams.get("period") ?? "90";
+  const periodValue = url.searchParams.get("period") ?? "180";
   if (!(["30", "90", "180", "all"] as const).includes(periodValue as Period)) {
     throw new PublicError(400, "INVALID_PERIOD", "期間指定が不正です。");
   }
-  const exercise = url.searchParams.get("exercise")?.trim() || null;
-  if (exercise && exercise.length > 100) {
-    throw new PublicError(400, "INVALID_EXERCISE", "種目指定が不正です。");
-  }
   const data = workoutData ?? { records: [], warnings: [] };
-  return json(
-    buildDashboard(data.records, data.warnings, lastSyncedAt, periodValue as Period, exercise),
-  );
+  return json(buildDashboard(data.records, data.warnings, lastSyncedAt, periodValue as Period));
 }
 
 function secureResponse(body: BodyInit, contentType: string, cacheControl = "no-store"): Response {
@@ -323,5 +313,5 @@ function ensureNotDemo(): void {
 }
 
 function favicon(): string {
-  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect width="64" height="64" rx="18" fill="#19231f"/><path d="M12 28h7v-7h6v22h-6v-7h-7zm40 0h-7v-7h-6v22h6v-7h7zM25 29h14v6H25z" fill="#b8f34a"/></svg>`;
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect width="64" height="64" rx="18" fill="#d6e3ff"/><path d="M12 28h7v-7h6v22h-6v-7h-7zm40 0h-7v-7h-6v22h6v-7h7zM25 29h14v6H25z" fill="#284777"/></svg>`;
 }

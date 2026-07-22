@@ -4,134 +4,131 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="color-scheme" content="light dark" />
-    <meta name="theme-color" content="#17201c" />
+    <meta name="theme-color" content="#f9f9ff" />
     <title>Workout Board</title>
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
-    <link rel="stylesheet" href="/assets/styles.css" />
-    <script type="module" src="/assets/app.js"></script>
+    <link rel="stylesheet" href="/assets/styles.css?v=material-insights-1" />
+    <script type="module" src="/assets/app.js?v=material-insights-1"></script>
   </head>
   <body>
     <a class="skip-link" href="#main">メインコンテンツへ</a>
     <header class="topbar">
       <a class="brand" href="/" aria-label="Workout Board ホーム">
-        <span class="brand-mark" aria-hidden="true"><i></i><b></b><i></i></span>
-        <span><strong>WORKOUT</strong><small>BOARD</small></span>
+        <span class="brand-mark" aria-hidden="true">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9v6m3-8v10m3-6h4m3-4v10m3-8v6M7 12h10" /></svg>
+        </span>
+        <span class="brand-name">Workout Board</span>
       </a>
       <div class="topbar-actions">
         <span id="demo-badge" class="badge hidden">DEMO</span>
         <span id="sync-status" class="sync-status">未取り込み</span>
-        <button id="settings-button" class="data-button" type="button" title="取込データを管理する">
+        <button id="settings-button" class="data-button" type="button" aria-label="データ管理" title="取込データを管理する">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v11m-4-4 4 4 4-4M5 19h14" /></svg>
-          <span>データ管理</span>
+          <span class="data-button-label">データ管理</span>
         </button>
       </div>
     </header>
 
     <main id="main" class="container">
-      <section class="hero" aria-labelledby="page-title">
+      <section class="page-header" aria-labelledby="page-title">
         <div>
-          <p class="eyebrow">PROGRESS OVER TIME</p>
-          <h1 id="page-title">積み重ねを、<em>強さ</em>に変える。</h1>
+          <p class="overline">TRAINING DASHBOARD</p>
+          <h1 id="page-title">トレーニング状況</h1>
           <p id="date-range" class="date-range">トレーニング記録を読み込んでいます</p>
         </div>
-        <fieldset class="filters" aria-label="表示フィルター">
-          <label>期間
-            <select id="period-select">
-              <option value="30">直近1ヶ月</option>
-              <option value="90">直近3ヶ月</option>
-              <option value="180" selected>直近6ヶ月</option>
-              <option value="all">全期間</option>
-            </select>
-          </label>
-          <label>種目
-            <select id="exercise-select"><option value="">すべての種目</option></select>
-          </label>
-        </fieldset>
+        <label class="outlined-field period-field">
+          <span>表示期間</span>
+          <select id="period-select">
+            <option value="30">直近1ヶ月</option>
+            <option value="90">直近3ヶ月</option>
+            <option value="180" selected>直近6ヶ月</option>
+            <option value="all">全期間</option>
+          </select>
+        </label>
       </section>
 
       <section id="empty-state" class="empty-state hidden" aria-live="polite">
-        <span class="empty-icon" aria-hidden="true">↗</span>
-        <h2>最初の記録をつなぎましょう</h2>
-        <p>Google Sheetsから書き出したCSVまたはTSVを取り込んでください。</p>
-        <button id="empty-settings-button" class="primary-button" type="button">ファイルを取り込む</button>
+        <span class="empty-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 19V9m7 10V5m7 14v-7" /></svg>
+        </span>
+        <h2>最初の記録を取り込みましょう</h2>
+        <p>Google Sheetsから書き出したCSVまたはTSVを選択してください。</p>
+        <button id="empty-settings-button" class="filled-button" type="button">ファイルを取り込む</button>
       </section>
 
       <div id="dashboard" class="dashboard hidden">
-        <section class="kpi-grid" aria-label="主要な指標">
-          <article class="kpi-card lime"><p>総ボリューム</p><strong id="kpi-volume">—</strong><span id="change-volume"></span></article>
-          <article class="kpi-card"><p>セッション</p><strong id="kpi-sessions">—</strong><span id="change-sessions"></span></article>
-          <article class="kpi-card"><p>完了セット</p><strong id="kpi-sets">—</strong><span id="change-sets"></span></article>
-          <article class="kpi-card dark"><p>最高 推定1RM</p><strong id="kpi-one-rm">—</strong><span id="change-one-rm"></span></article>
+        <section class="insight-grid" aria-label="現在のトレーニング状況">
+          <article class="insight-card">
+            <span class="insight-icon" aria-hidden="true"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 8v5l3 2M5 4v4h4M6.3 17.7A8 8 0 1 0 4 12" /></svg></span>
+            <div><p>最終トレーニング</p><strong id="insight-last">—</strong><span id="insight-last-detail" class="insight-supporting">記録なし</span></div>
+          </article>
+          <article class="insight-card">
+            <span class="insight-icon" aria-hidden="true"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 19V9m5 10V5m5 14v-7m5 7V7" /></svg></span>
+            <div><p>週平均頻度</p><strong id="insight-frequency">—</strong><span class="insight-supporting">直近28日</span></div>
+          </article>
+          <article class="insight-card">
+            <span class="insight-icon" aria-hidden="true"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 12.5 11 15l5-6m4 3a8 8 0 1 1-16 0 8 8 0 0 1 16 0Z" /></svg></span>
+            <div><p>継続週数</p><strong id="insight-streak">—</strong><span class="insight-supporting">週1回以上の連続</span></div>
+          </article>
+          <article class="insight-card">
+            <span class="insight-icon" aria-hidden="true"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 18 12-12m-8 0h8v8M5 6v12h12" /></svg></span>
+            <div><p>自己ベスト更新</p><strong id="insight-pr">—</strong><span class="insight-supporting">選択期間内の種目数</span></div>
+          </article>
         </section>
 
-        <section class="panel chart-panel" aria-labelledby="trend-title">
-          <div class="panel-heading">
-            <div><p class="eyebrow">PERFORMANCE</p><h2 id="trend-title">成長推移</h2></div>
-            <fieldset id="metric-tabs" class="segmented" aria-label="グラフ指標">
-              <button type="button" data-metric="volumeKg" class="active">ボリューム</button>
-              <button type="button" data-metric="topWeightKg">最高重量</button>
-              <button type="button" data-metric="estimatedOneRepMaxKg">推定1RM</button>
-            </fieldset>
+        <section id="exercise-progress" class="surface-card progress-panel" aria-labelledby="progress-title">
+          <div class="section-heading progress-heading">
+            <div>
+              <p class="overline">EXERCISE PROGRESS</p>
+              <h2 id="progress-title">トップセット推移</h2>
+              <p>日ごとの最大重量とセット内容を確認できます。</p>
+            </div>
+            <label class="outlined-field exercise-field">
+              <span>種目</span>
+              <select id="exercise-select" aria-label="推移を見る種目"></select>
+            </label>
+          </div>
+          <div class="top-set-summary">
+            <div><span class="summary-label">最新トップセット</span><strong id="exercise-latest-set" class="summary-value">—</strong></div>
+            <div><span class="summary-label">期間ベスト</span><strong id="exercise-best-set" class="summary-value">—</strong></div>
+            <div><span class="summary-label">期間内の変化</span><strong id="exercise-weight-change" class="summary-value">—</strong></div>
           </div>
           <div class="chart-wrap">
-            <svg id="trend-chart" role="img" aria-labelledby="chart-title chart-desc" viewBox="0 0 960 320">
-              <title id="chart-title">トレーニング成長推移</title>
-              <desc id="chart-desc">選択した期間の指標を日付順に示します。</desc>
-            </svg>
-            <div id="chart-tooltip" class="chart-tooltip" role="tooltip"></div>
-            <p id="chart-empty" class="chart-empty hidden">この条件の記録はありません。</p>
-          </div>
-        </section>
-
-        <section id="exercise-progress" class="panel chart-panel exercise-progress-panel" aria-labelledby="exercise-progress-title">
-          <div class="panel-heading exercise-progress-heading">
-            <div><p class="eyebrow">EXERCISE PROGRESS</p><h2 id="exercise-progress-title">種目ごとの推移</h2></div>
-            <div class="exercise-progress-controls">
-              <label class="inline-select">種目
-                <select id="exercise-trend-select" aria-label="推移を見る種目"></select>
-              </label>
-              <fieldset id="exercise-metric-tabs" class="segmented" aria-label="種目グラフ指標">
-                <button type="button" data-metric="topWeightKg" class="active">最高重量</button>
-                <button type="button" data-metric="estimatedOneRepMaxKg">推定1RM</button>
-                <button type="button" data-metric="volumeKg">ボリューム</button>
-              </fieldset>
-            </div>
-          </div>
-          <div class="exercise-progress-body">
-            <aside class="progress-stats" aria-label="選択した種目のサマリー">
-              <div><span>最新重量</span><strong id="exercise-latest-weight">—</strong></div>
-              <div><span>期間ベスト</span><strong id="exercise-best-weight">—</strong></div>
-              <div><span>トレーニング日数</span><strong id="exercise-session-count">—</strong></div>
-            </aside>
-            <div class="chart-wrap exercise-chart-wrap">
-              <svg id="exercise-trend-chart" role="img" aria-labelledby="exercise-chart-title exercise-chart-desc" viewBox="0 0 960 320">
-                <title id="exercise-chart-title">種目別の成長推移</title>
-                <desc id="exercise-chart-desc">選択した種目の指標を日付順に示します。</desc>
+            <div class="chart-scroll">
+              <svg id="progress-chart" role="img" aria-labelledby="chart-title chart-desc" viewBox="0 0 960 320">
+                <title id="chart-title">種目別トップセット推移</title>
+                <desc id="chart-desc">選択した種目の日ごとの最大重量を日付順に示します。</desc>
               </svg>
-              <div id="exercise-chart-tooltip" class="chart-tooltip" role="tooltip"></div>
-              <p id="exercise-chart-empty" class="chart-empty hidden">この期間の記録はありません。</p>
             </div>
+            <div id="chart-tooltip" class="chart-tooltip" role="tooltip"></div>
+            <p id="chart-empty" class="chart-empty hidden">この期間の記録はありません。</p>
           </div>
         </section>
 
-        <section class="two-column">
-          <article class="panel exercise-panel" aria-labelledby="exercise-title">
-            <div class="panel-heading"><div><p class="eyebrow">EXERCISES</p><h2 id="exercise-title">種目別サマリー</h2></div></div>
+        <section class="content-grid">
+          <article class="surface-card exercise-panel" aria-labelledby="exercise-title">
+            <div class="section-heading compact-heading">
+              <div><p class="overline">EXERCISES</p><h2 id="exercise-title">種目一覧</h2></div>
+            </div>
             <div class="table-scroll">
               <table>
-                <thead><tr><th>種目</th><th>最高重量</th><th>推定1RM</th><th>ボリューム</th></tr></thead>
+                <thead><tr><th>種目</th><th>最終実施</th><th>期間ベスト</th><th>実施日数</th></tr></thead>
                 <tbody id="exercise-table"></tbody>
               </table>
             </div>
           </article>
-          <article class="panel note-panel" aria-labelledby="note-title">
-            <div class="panel-heading"><div><p class="eyebrow">LATEST NOTES</p><h2 id="note-title">最近のメモ</h2></div></div>
+          <article class="surface-card note-panel" aria-labelledby="note-title">
+            <div class="section-heading compact-heading">
+              <div><p class="overline">LATEST NOTES</p><h2 id="note-title">最近のメモ</h2></div>
+            </div>
             <ul id="note-list" class="note-list"></ul>
           </article>
         </section>
 
-        <section class="panel history-panel" aria-labelledby="history-title">
-          <div class="panel-heading"><div><p class="eyebrow">SESSIONS</p><h2 id="history-title">セッション履歴</h2></div></div>
+        <section class="surface-card history-panel" aria-labelledby="history-title">
+          <div class="section-heading compact-heading">
+            <div><p class="overline">SESSIONS</p><h2 id="history-title">セッション履歴</h2></div>
+          </div>
           <div id="history-list" class="history-list"></div>
         </section>
 
@@ -145,15 +142,15 @@
     <dialog id="settings-dialog">
       <form method="dialog" class="dialog-shell">
         <div class="dialog-heading">
-          <div><p class="eyebrow">DATA SOURCE</p><h2>トレーニング記録</h2></div>
-          <button class="close-button" type="submit" value="cancel" aria-label="設定を閉じる">×</button>
+          <div><p class="overline">DATA SOURCE</p><h2>データ管理</h2></div>
+          <button class="icon-button close-button" type="submit" value="cancel" aria-label="設定を閉じる">×</button>
         </div>
-        <section id="import-step" class="setup-step active">
-          <span>CSV</span>
+        <section id="import-step" class="import-card">
+          <span class="import-icon" aria-hidden="true"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v11m-4-4 4 4 4-4M5 19h14" /></svg></span>
           <div>
             <h3>CSV / TSVファイルを取り込む</h3>
-            <p>Google Sheetsで「ファイル → ダウンロード」からCSVを保存してください。データはこのMac内だけに保存されます。</p>
-            <label id="choose-file-button" class="file-button" for="import-file">ファイルを選択</label>
+            <p>Google Sheetsの「ファイル → ダウンロード」からCSVを保存してください。データはこのMac内だけに保存されます。</p>
+            <label id="choose-file-button" class="filled-button file-button" for="import-file">ファイルを選択</label>
             <input id="import-file" class="file-input" type="file" accept=".csv,.tsv,text/csv,text/tab-separated-values" />
             <p id="import-source" class="import-source hidden"></p>
           </div>
