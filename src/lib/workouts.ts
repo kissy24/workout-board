@@ -1,12 +1,10 @@
 import type {
   DashboardSummary,
   ExerciseSummary,
-  Metric,
   ParsedWorkoutSheet,
   Period,
   SessionExercise,
   SessionSummary,
-  TrendPoint,
   ValidationWarning,
   WorkoutRecord,
 } from "./types";
@@ -159,45 +157,102 @@ function subtractDays(date: string, days: number): string {
   return new Date(Date.parse(`${date}T00:00:00Z`) - days * DAY_MS).toISOString().slice(0, 10);
 }
 
-function percentChange(current: number, previous: number): number | null {
-  if (previous === 0) return null;
-  return ((current - previous) / previous) * 100;
-}
-
-function metric(current: number, previous: number): Metric {
-  return { value: current, percentChange: percentChange(current, previous) };
-}
-
-function totalVolume(records: WorkoutRecord[]): number {
-  return records.reduce((sum, record) => sum + record.volumeKg, 0);
-}
-
 function sessionCount(records: WorkoutRecord[]): number {
   return new Set(records.map((record) => record.date)).size;
 }
 
-function bestOneRepMax(records: WorkoutRecord[]): number {
-  return records.reduce(
-    (best, record) => Math.max(best, estimatedOneRepMax(record.weightKg, record.reps)),
-    0,
+function calendarDayDifference(later: string, earlier: string): number {
+  return Math.floor(
+    (Date.parse(`${later}T00:00:00Z`) - Date.parse(`${earlier}T00:00:00Z`)) / DAY_MS,
   );
 }
 
-function buildTrends(records: WorkoutRecord[]): TrendPoint[] {
-  const byDate = new Map<string, WorkoutRecord[]>();
-  for (const record of records) {
-    const entries = byDate.get(record.date) ?? [];
-    entries.push(record);
-    byDate.set(record.date, entries);
+function localToday(): string {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, "0");
+  const day = String(now.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function mondayOfWeek(date: string): string {
+  const value = new Date(`${date}T00:00:00Z`);
+  const weekday = value.getUTCDay();
+  return subtractDays(date, weekday === 0 ? 6 : weekday - 1);
+}
+
+function hasSessionInWeek(sessionDates: Set<string>, weekStart: string): boolean {
+  const weekEnd = subtractDays(weekStart, -6);
+  return [...sessionDates].some((date) => date >= weekStart && date <= weekEnd);
+}
+
+function activeWeekStreak(records: WorkoutRecord[], referenceDate: string): number {
+  const sessionDates = new Set(
+    records.filter((record) => record.date <= referenceDate).map((record) => record.date),
+  );
+  const currentWeek = mondayOfWeek(referenceDate);
+  let cursor = hasSessionInWeek(sessionDates, currentWeek)
+    ? currentWeek
+    : subtractDays(currentWeek, 7);
+  if (!hasSessionInWeek(sessionDates, cursor)) return 0;
+
+  let streak = 0;
+  while (hasSessionInWeek(sessionDates, cursor)) {
+    streak += 1;
+    cursor = subtractDays(cursor, 7);
   }
-  return [...byDate.entries()]
-    .sort(([a], [b]) => a.localeCompare(b))
-    .map(([date, entries]) => ({
-      date,
-      volumeKg: totalVolume(entries),
-      topWeightKg: Math.max(...entries.map((entry) => entry.weightKg)),
-      estimatedOneRepMaxKg: bestOneRepMax(entries),
-    }));
+  return streak;
+}
+
+function weeklyFrequency(records: WorkoutRecord[], referenceDate: string): number {
+  const start = subtractDays(referenceDate, 27);
+  const days = new Set(
+    records
+      .filter((record) => record.date >= start && record.date <= referenceDate)
+      .map((record) => record.date),
+  ).size;
+  return days / 4;
+}
+
+function personalRecordExerciseCount(
+  records: WorkoutRecord[],
+  rangeStart: string | null,
+  rangeEnd: string | null,
+): number {
+  if (!rangeStart || !rangeEnd) return 0;
+  const dailyBest = new Map<string, { exercise: string; date: string; weightKg: number }>();
+  for (const record of records) {
+    if (record.date > rangeEnd) continue;
+    const key = `${record.exercise}\0${record.date}`;
+    const existing = dailyBest.get(key);
+    if (!existing || record.weightKg > existing.weightKg) {
+      dailyBest.set(key, {
+        exercise: record.exercise,
+        date: record.date,
+        weightKg: record.weightKg,
+      });
+    }
+  }
+
+  const bestByExercise = new Map<string, number>();
+  const updatedExercises = new Set<string>();
+  const points = [...dailyBest.values()].sort(
+    (a, b) => a.date.localeCompare(b.date) || a.exercise.localeCompare(b.exercise, "ja"),
+  );
+  for (const point of points) {
+    const previousBest = bestByExercise.get(point.exercise);
+    if (point.date >= rangeStart && previousBest !== undefined && point.weightKg > previousBest) {
+      updatedExercises.add(point.exercise);
+    }
+    bestByExercise.set(point.exercise, Math.max(previousBest ?? point.weightKg, point.weightKg));
+  }
+  return updatedExercises.size;
+}
+
+function betterSet(a: WorkoutRecord, b: WorkoutRecord): WorkoutRecord {
+  if (a.weightKg !== b.weightKg) return a.weightKg > b.weightKg ? a : b;
+  if (a.reps !== b.reps) return a.reps > b.reps ? a : b;
+  return a.set < b.set ? a : b;
 }
 
 function buildExerciseSummaries(records: WorkoutRecord[]): ExerciseSummary[] {
@@ -208,16 +263,19 @@ function buildExerciseSummaries(records: WorkoutRecord[]): ExerciseSummary[] {
     groups.set(record.exercise, entries);
   }
   return [...groups.entries()]
-    .map(([exercise, entries]) => ({
-      exercise,
-      totalVolumeKg: totalVolume(entries),
-      topWeightKg: Math.max(...entries.map((entry) => entry.weightKg)),
-      estimatedOneRepMaxKg: bestOneRepMax(entries),
-      setCount: entries.length,
-      sessionCount: sessionCount(entries),
-    }))
+    .map(([exercise, entries]) => {
+      const bestSet = entries.reduce(betterSet);
+      return {
+        exercise,
+        latestDate: entries.at(-1)?.date ?? "",
+        bestSetWeightKg: bestSet.weightKg,
+        bestSetReps: bestSet.reps,
+        sessionCount: sessionCount(entries),
+      };
+    })
     .sort(
-      (a, b) => b.totalVolumeKg - a.totalVolumeKg || a.exercise.localeCompare(b.exercise, "ja"),
+      (a, b) =>
+        b.latestDate.localeCompare(a.latestDate) || a.exercise.localeCompare(b.exercise, "ja"),
     );
 }
 
@@ -251,7 +309,7 @@ function buildSessions(records: WorkoutRecord[]): SessionSummary[] {
             })),
         }),
       );
-      return { date, totalVolumeKg: totalVolume(entries), exercises };
+      return { date, exercises };
     });
 }
 
@@ -260,43 +318,35 @@ export function buildDashboard(
   warnings: ValidationWarning[],
   lastSyncedAt: string | null,
   period: Period,
-  exercise: string | null,
+  referenceDate = localToday(),
 ): DashboardSummary {
   const availableExercises = [...new Set(allRecords.map((record) => record.exercise))].sort(
     (a, b) => a.localeCompare(b, "ja"),
   );
-  const exerciseRecords = exercise
-    ? allRecords.filter((record) => record.exercise === exercise)
-    : allRecords;
-  const latestDate = exerciseRecords.at(-1)?.date ?? null;
+  const latestDate = allRecords.at(-1)?.date ?? null;
   const days = period === "all" ? null : Number(period);
   const start = latestDate && days ? subtractDays(latestDate, days - 1) : null;
-  const current = exerciseRecords.filter(
+  const current = allRecords.filter(
     (record) => (!start || record.date >= start) && (!latestDate || record.date <= latestDate),
   );
-  const previousEnd = start && days ? subtractDays(start, 1) : null;
-  const previousStart = previousEnd && days ? subtractDays(previousEnd, days - 1) : null;
-  const previous =
-    previousStart && previousEnd
-      ? exerciseRecords.filter(
-          (record) => record.date >= previousStart && record.date <= previousEnd,
-        )
-      : [];
+  const rangeStart = period === "all" ? (allRecords[0]?.date ?? null) : start;
+  const lastWorkoutDate = latestDate;
 
   return {
     period,
-    exercise,
     range: {
-      start: period === "all" ? (exerciseRecords[0]?.date ?? null) : start,
+      start: rangeStart,
       end: latestDate,
     },
-    kpis: {
-      totalVolumeKg: metric(totalVolume(current), totalVolume(previous)),
-      sessionCount: metric(sessionCount(current), sessionCount(previous)),
-      setCount: metric(current.length, previous.length),
-      estimatedOneRepMaxKg: metric(bestOneRepMax(current), bestOneRepMax(previous)),
+    insights: {
+      lastWorkoutDate,
+      daysSinceLastWorkout: lastWorkoutDate
+        ? Math.max(0, calendarDayDifference(referenceDate, lastWorkoutDate))
+        : null,
+      weeklyFrequency: weeklyFrequency(allRecords, referenceDate),
+      activeWeekStreak: activeWeekStreak(allRecords, referenceDate),
+      personalRecordExerciseCount: personalRecordExerciseCount(allRecords, rangeStart, latestDate),
     },
-    trends: buildTrends(current),
     exercises: buildExerciseSummaries(current),
     sessions: buildSessions(current),
     availableExercises,

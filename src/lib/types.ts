@@ -21,24 +21,11 @@ export interface ParsedWorkoutSheet {
 
 export type Period = "30" | "90" | "180" | "all";
 
-export interface Metric {
-  value: number;
-  percentChange: number | null;
-}
-
-export interface TrendPoint {
-  date: string;
-  volumeKg: number;
-  topWeightKg: number;
-  estimatedOneRepMaxKg: number;
-}
-
 export interface ExerciseSummary {
   exercise: string;
-  totalVolumeKg: number;
-  topWeightKg: number;
-  estimatedOneRepMaxKg: number;
-  setCount: number;
+  latestDate: string;
+  bestSetWeightKg: number;
+  bestSetReps: number;
   sessionCount: number;
 }
 
@@ -49,21 +36,21 @@ export interface SessionExercise {
 
 export interface SessionSummary {
   date: string;
-  totalVolumeKg: number;
   exercises: SessionExercise[];
+}
+
+export interface DashboardInsights {
+  lastWorkoutDate: string | null;
+  daysSinceLastWorkout: number | null;
+  weeklyFrequency: number;
+  activeWeekStreak: number;
+  personalRecordExerciseCount: number;
 }
 
 export interface DashboardSummary {
   period: Period;
-  exercise: string | null;
   range: { start: string | null; end: string | null };
-  kpis: {
-    totalVolumeKg: Metric;
-    sessionCount: Metric;
-    setCount: Metric;
-    estimatedOneRepMaxKg: Metric;
-  };
-  trends: TrendPoint[];
+  insights: DashboardInsights;
   exercises: ExerciseSummary[];
   sessions: SessionSummary[];
   availableExercises: string[];
