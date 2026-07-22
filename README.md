@@ -109,6 +109,8 @@ Workout Boardは `127.0.0.1` だけで待ち受け、通常モードでは外部
 | `bun test` | テストを実行 |
 | `bun run build` | Bun向けにサーバーをビルド |
 | `bun run check` | 型、Lint、テスト、ビルドをまとめて実行 |
+| `bun run precommit` | コミット前の全検証とステージ済み差分の空白チェック |
+| `bun run hooks:install` | Gitのpre-commitフックを有効化 |
 | `bun run security` | 依存関係の脆弱性を検査 |
 
 ポートを変更する場合は、1024〜65535の値を指定します。
@@ -131,6 +133,8 @@ examples/         # 取り込み用サンプル
 ```
 
 CIではmacOS上の型チェック、Lint、テスト、ビルドに加えて、OSVによる依存関係検査とGitleaksによる秘密情報検査を実行します。
+
+`bun install`を実行すると、リポジトリに含まれるpre-commitフックが自動的に有効になります。コミット時には`bun run precommit`が実行され、CIへ送る前に型、Lint、テスト、ビルド、空白エラーを検出します。ブランチ作成からPR・CI確認までの開発手順は [AGENTS.md](AGENTS.md) に記載しています。
 
 ## ライセンス
 
