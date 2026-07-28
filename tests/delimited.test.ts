@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { parseDelimitedText } from "../src/lib/delimited";
-import { parseImportedFile } from "../src/lib/import-store";
+import { parseImportedFile } from "../src/lib/import";
 
 const header = "日付,種目,セット,重さ(kg),レップ数,ボリューム(kg),メモ";
 

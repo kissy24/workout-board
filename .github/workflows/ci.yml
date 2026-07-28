@@ -11,9 +11,9 @@ permissions:
 
 jobs:
   validate:
-    name: Bun checks on macOS
+    name: Bun and Tauri checks on macOS
     runs-on: macos-latest
-    timeout-minutes: 15
+    timeout-minutes: 30
 
     steps:
       - name: Checkout repository
@@ -24,10 +24,18 @@ jobs:
         with:
           bun-version: 1.3.14
 
+      - name: Set up stable Rust
+        run: |
+          rustup toolchain install stable --profile minimal
+          rustup default stable
+
       - name: Install locked dependencies
         run: bun install --frozen-lockfile
 
-      - name: Run type, lint, test, and build checks
+      - name: Fetch locked Rust dependencies
+        run: cargo fetch --locked --manifest-path src-tauri/Cargo.toml
+
+      - name: Run TypeScript, Rust, test, and build checks
         run: bun run check
 
       - name: Scan Bun dependencies

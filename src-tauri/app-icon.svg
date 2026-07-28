@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
+  <title>Workout Board</title>
+  <defs>
+    <linearGradient id="background" x1="128" y1="96" x2="896" y2="928" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#E9F0FF"/>
+      <stop offset="1" stop-color="#B8CDFA"/>
+    </linearGradient>
+  </defs>
+  <rect x="72" y="72" width="880" height="880" rx="220" fill="url(#background)"/>
+  <path d="M208 424h96V312h80v400h-80V600h-96zm608 0h-96V312h-80v400h80V600h96zM384 464h256v96H384z" fill="#284777"/>
+</svg>

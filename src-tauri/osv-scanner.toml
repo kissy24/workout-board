@@ -1,0 +1,88 @@
+# Tauri's Cargo.lock contains Linux-only GTK dependencies even though this application only
+# targets macOS. The remaining entries are unmaintained transitive crates without fixed releases.
+# Keep these exceptions narrow and revisit them when Tauri updates its dependency graph.
+
+[[IgnoredVulns]]
+id = "RUSTSEC-2024-0413"
+ignoreUntil = 2027-01-31
+reason = "Linux-only ATK dependency; it is not compiled into the macOS application."
+
+[[IgnoredVulns]]
+id = "RUSTSEC-2024-0416"
+ignoreUntil = 2027-01-31
+reason = "Linux-only ATK dependency; it is not compiled into the macOS application."
+
+[[IgnoredVulns]]
+id = "RUSTSEC-2024-0412"
+ignoreUntil = 2027-01-31
+reason = "Linux-only GDK dependency; it is not compiled into the macOS application."
+
+[[IgnoredVulns]]
+id = "RUSTSEC-2024-0418"
+ignoreUntil = 2027-01-31
+reason = "Linux-only GDK dependency; it is not compiled into the macOS application."
+
+[[IgnoredVulns]]
+id = "RUSTSEC-2024-0411"
+ignoreUntil = 2027-01-31
+reason = "Linux-only Wayland dependency; it is not compiled into the macOS application."
+
+[[IgnoredVulns]]
+id = "RUSTSEC-2024-0417"
+ignoreUntil = 2027-01-31
+reason = "Linux-only X11 dependency; it is not compiled into the macOS application."
+
+[[IgnoredVulns]]
+id = "RUSTSEC-2024-0414"
+ignoreUntil = 2027-01-31
+reason = "Linux-only X11 dependency; it is not compiled into the macOS application."
+
+[[IgnoredVulns]]
+id = "RUSTSEC-2024-0429"
+ignoreUntil = 2027-01-31
+reason = "Linux-only GLib dependency; it is not compiled into the macOS application."
+
+[[IgnoredVulns]]
+id = "RUSTSEC-2024-0415"
+ignoreUntil = 2027-01-31
+reason = "Linux-only GTK dependency; it is not compiled into the macOS application."
+
+[[IgnoredVulns]]
+id = "RUSTSEC-2024-0420"
+ignoreUntil = 2027-01-31
+reason = "Linux-only GTK dependency; it is not compiled into the macOS application."
+
+[[IgnoredVulns]]
+id = "RUSTSEC-2024-0419"
+ignoreUntil = 2027-01-31
+reason = "Linux-only GTK dependency; it is not compiled into the macOS application."
+
+[[IgnoredVulns]]
+id = "RUSTSEC-2024-0370"
+ignoreUntil = 2027-01-31
+reason = "Unmaintained transitive proc-macro crate with no fixed release; not present in the macOS target graph."
+
+[[IgnoredVulns]]
+id = "RUSTSEC-2025-0081"
+ignoreUntil = 2027-01-31
+reason = "Unmaintained transitive Unicode metadata crate with no fixed release; inherited from Tauri."
+
+[[IgnoredVulns]]
+id = "RUSTSEC-2025-0075"
+ignoreUntil = 2027-01-31
+reason = "Unmaintained transitive Unicode metadata crate with no fixed release; inherited from Tauri."
+
+[[IgnoredVulns]]
+id = "RUSTSEC-2025-0080"
+ignoreUntil = 2027-01-31
+reason = "Unmaintained transitive Unicode metadata crate with no fixed release; inherited from Tauri."
+
+[[IgnoredVulns]]
+id = "RUSTSEC-2025-0100"
+ignoreUntil = 2027-01-31
+reason = "Unmaintained transitive Unicode metadata crate with no fixed release; inherited from Tauri."
+
+[[IgnoredVulns]]
+id = "RUSTSEC-2025-0098"
+ignoreUntil = 2027-01-31
+reason = "Unmaintained transitive Unicode metadata crate with no fixed release; inherited from Tauri."
