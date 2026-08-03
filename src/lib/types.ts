@@ -83,6 +83,11 @@ export interface ImportedFile {
   importedAt: string;
 }
 
+export interface StoredImport extends ImportedFile {
+  version: 1;
+  contents: string;
+}
+
 export interface OAuthClientCredentials {
   clientId: string;
   clientSecret: string;

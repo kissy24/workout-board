@@ -1,9 +1,10 @@
 # Workout Board
 
-筋力トレーニングの記録を、Macの中だけで安全に可視化するローカルファーストなダッシュボードです。CSV／TSVを取り込むだけで、トレーニング量や種目ごとの成長をすぐに振り返れます。
+筋力トレーニングの記録を、Macの中だけで安全に可視化するローカルファーストなデスクトップダッシュボードです。CSV／TSVを取り込むだけで、トレーニング量や種目ごとの成長をすぐに振り返れます。
 
 [![CI](https://github.com/kissy24/workout-board/actions/workflows/ci.yml/badge.svg)](https://github.com/kissy24/workout-board/actions/workflows/ci.yml)
 ![Bun](https://img.shields.io/badge/runtime-Bun%201.3.14-19231f)
+![Tauri](https://img.shields.io/badge/desktop-Tauri%202-24c8db)
 [![License: MIT](https://img.shields.io/badge/license-MIT-b9f34a)](LICENSE)
 
 ## 特徴
@@ -15,17 +16,20 @@
 - 種目ごとの最終実施日と期間ベスト、セット履歴、最近のメモを表示
 - 不正な行を集計から除外し、元ファイルの行番号と理由を表示
 - Material 3に沿ったライト／ダーク表示、レスポンシブ表示、キーボード操作に対応
+- Tauri 2による軽量なmacOSデスクトップアプリ
 - 取り込んだデータはMac内にのみ保存
 
 ダンベル重量は入力値をそのまま扱い、両手分への自動換算は行いません。
 
 ## 必要な環境
 
-- macOS
+- macOS 12以上
 - [Bun](https://bun.sh/) 1.3.14以上
+- [Rust](https://www.rust-lang.org/tools/install) stable
+- Xcode Command Line Tools（`xcode-select --install`）
 - Git
 
-Node.jsとnpmは使用しません。依存関係のインストールからテスト、ビルドまでBunで実行します。
+Node.jsとnpmは使用しません。JavaScript依存関係と開発コマンドはBun、デスクトップアプリ部分はRustで管理します。
 
 ## クイックスタート
 
@@ -36,7 +40,7 @@ bun install --frozen-lockfile
 bun run dev
 ```
 
-ブラウザーで [http://127.0.0.1:4173](http://127.0.0.1:4173) を開きます。
+Workout Boardのデスクトップウィンドウが開きます。
 
 1. 初回画面の「ファイルを取り込む」を選択します。
 2. Google Sheetsなどから保存したCSVまたはTSVを選択します。
@@ -82,7 +86,7 @@ Google Sheetsを利用する場合は、記録のあるワークシートを開�
 
 ## データ保存とセキュリティ
 
-Workout Boardは `127.0.0.1` だけで待ち受け、通常モードでは外部サービスへトレーニング記録を送信しません。
+Workout BoardはローカルHTTPサーバーを起動せず、画面とRustバックエンドの間をTauri IPCで接続します。通常モードでは外部サービスへトレーニング記録を送信しません。
 
 取り込んだ内容は次の場所へ保存され、次回起動時に復元されます。
 
@@ -102,37 +106,40 @@ Workout Boardは `127.0.0.1` だけで待ち受け、通常モードでは外部
 
 | コマンド | 用途 |
 | --- | --- |
-| `bun run dev` | ホットリロード付きで開発サーバーを起動 |
-| `bun run start` | 通常のローカルサーバーを起動 |
+| `bun run dev` | ホットリロード付きでTauriアプリを起動 |
+| `bun run build:frontend` | 画面の静的アセットをビルド |
 | `bun run typecheck` | TypeScriptの型チェック |
 | `bun run lint` | Biomeによる静的チェック |
 | `bun test` | テストを実行 |
-| `bun run build` | Bun向けにサーバーをビルド |
-| `bun run check` | 型、Lint、テスト、ビルドをまとめて実行 |
+| `bun run check:rust` | Rustのformat、Clippy、テストを実行 |
+| `bun run build` | Tauriアプリをリリースビルド |
+| `bun run bundle:mac` | macOS用の`.app`と`.dmg`を生成 |
+| `bun run check` | 型、Lint、全テスト、Tauriビルドをまとめて実行 |
 | `bun run precommit` | コミット前の全検証とステージ済み差分の空白チェック |
 | `bun run hooks:install` | Gitのpre-commitフックを有効化 |
-| `bun run security` | 依存関係の脆弱性を検査 |
+| `bun run security` | Bun依存関係の脆弱性を検査 |
 
-ポートを変更する場合は、1024〜65535の値を指定します。
+配布用ファイルは次の場所に生成されます。
 
-```sh
-WORKOUT_BOARD_PORT=5173 bun run dev
+```text
+src-tauri/target/release/bundle/macos/Workout Board.app
+src-tauri/target/release/bundle/dmg/Workout Board_0.1.0_aarch64.dmg
 ```
 
-保存先を一時的に変更したい場合は `WORKOUT_BOARD_DATA_DIRECTORY` を指定できます。
+ローカルビルドはad-hoc署名されますが、Appleによる公証は行いません。別のMacへ配布する場合は、Developer IDによる署名と公証を行ってください。
 
 ## プロジェクト構成
 
 ```text
 src/
-├── client/       # ダッシュボードのHTML、CSS、ブラウザー処理
-├── lib/          # CSV解析、集計、保存、Google連携用アダプター
-└── server.ts     # BunローカルサーバーとAPI
+├── client/       # ダッシュボードのHTML、CSS、WebView処理
+└── lib/          # CSV解析、集計、Google連携用アダプター
+src-tauri/         # Tauri設定、macOSアプリ、保存IPC
 tests/            # 単体・統合テスト
 examples/         # 取り込み用サンプル
 ```
 
-CIではmacOS上の型チェック、Lint、テスト、ビルドに加えて、OSVによる依存関係検査とGitleaksによる秘密情報検査を実行します。
+CIではmacOS上のTypeScript/Rustの型・Lint・テスト・Tauriビルドに加えて、OSVによるBun/Cargo依存関係検査とGitleaksによる秘密情報検査を実行します。
 
 `bun install`を実行すると、リポジトリに含まれるpre-commitフックが自動的に有効になります。コミット時には`bun run precommit`が実行され、CIへ送る前に型、Lint、テスト、ビルド、空白エラーを検出します。ブランチ作成からPR・CI確認までの開発手順は [AGENTS.md](AGENTS.md) に記載しています。
 

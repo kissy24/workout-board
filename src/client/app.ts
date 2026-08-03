@@ -1,16 +1,26 @@
-import type { DashboardSummary, ImportedFile, SessionExercise } from "../lib/types";
+import { invoke } from "@tauri-apps/api/core";
+import { DEMO_VALUES } from "../lib/demo";
+import { parseImportedFile } from "../lib/import";
+import type {
+  DashboardSummary,
+  ImportedFile,
+  ParsedWorkoutSheet,
+  Period,
+  SessionExercise,
+  StoredImport,
+} from "../lib/types";
+import { buildDashboard, parseWorkoutValues } from "../lib/workouts";
 
 interface BootstrapState {
-  csrfToken: string;
   importedFile: ImportedFile | null;
-  hasData: boolean;
   demoMode: boolean;
+  storageError: boolean;
 }
 
-interface ImportResult {
-  file: ImportedFile;
-  recordCount: number;
-  warningCount: number;
+interface AppState {
+  storedImport: StoredImport | null;
+  demoMode: boolean;
+  loadError: string | null;
 }
 
 type WorkoutSet = SessionExercise["sets"][number];
@@ -54,6 +64,8 @@ const elements = {
 };
 
 let bootstrapState: BootstrapState;
+let workoutData: ParsedWorkoutSheet | null = null;
+let lastSyncedAt: string | null = null;
 let summary: DashboardSummary | null = null;
 let toastTimer: number | null = null;
 
@@ -62,8 +74,31 @@ void initialize();
 async function initialize(): Promise<void> {
   attachListeners();
   try {
-    bootstrapState = await get<BootstrapState>("/api/bootstrap");
+    const appState = await invoke<AppState>("load_app_state");
+    bootstrapState = {
+      importedFile: appState.storedImport
+        ? {
+            type: "import",
+            fileName: appState.storedImport.fileName,
+            importedAt: appState.storedImport.importedAt,
+          }
+        : null,
+      demoMode: appState.demoMode,
+      storageError: appState.loadError !== null,
+    };
+    workoutData = appState.demoMode
+      ? parseWorkoutValues(DEMO_VALUES)
+      : appState.storedImport
+        ? parseImportedFile(appState.storedImport.fileName, appState.storedImport.contents)
+        : null;
+    lastSyncedAt = appState.demoMode
+      ? new Date().toISOString()
+      : (appState.storedImport?.importedAt ?? null);
     renderSourceState();
+    if (appState.loadError) {
+      setSettingsMessage(appState.loadError, true);
+      showToast(appState.loadError, true);
+    }
     if (bootstrapState.demoMode) elements.demoBadge.classList.remove("hidden");
     if (isConfigured()) {
       await loadDashboard();
@@ -120,7 +155,10 @@ function renderSourceState(): void {
   elements.importSource.textContent = source
     ? `現在のファイル: ${source.fileName}（${formatDateTime(source.importedAt)}）`
     : "";
-  elements.dangerActions.classList.toggle("hidden", bootstrapState.demoMode || source === null);
+  elements.dangerActions.classList.toggle(
+    "hidden",
+    bootstrapState.demoMode || (source === null && !bootstrapState.storageError),
+  );
 }
 
 async function importFile(): Promise<void> {
@@ -136,17 +174,21 @@ async function importFile(): Promise<void> {
   elements.syncStatus.textContent = "取り込み中…";
   setSettingsMessage("ファイルを読み込んでいます…");
   try {
-    const result = await post<ImportResult>("/api/import", {
+    const contents = await file.text();
+    const parsed = parseImportedFile(file.name, contents);
+    const importedFile = await invoke<ImportedFile>("save_import", {
       fileName: file.name,
-      contents: await file.text(),
+      contents,
     });
-    bootstrapState.importedFile = result.file;
-    bootstrapState.hasData = true;
+    bootstrapState.importedFile = importedFile;
+    bootstrapState.storageError = false;
+    workoutData = parsed;
+    lastSyncedAt = importedFile.importedAt;
     renderSourceState();
     await loadDashboard();
     setSettingsMessage("");
     elements.settingsDialog.close();
-    showToast(`${result.recordCount}セットを取り込みました。`);
+    showToast(`${parsed.records.length}セットを取り込みました。`);
   } catch (error) {
     elements.syncStatus.textContent = "取り込みエラー";
     setSettingsMessage(messageFrom(error), true);
@@ -158,8 +200,10 @@ async function importFile(): Promise<void> {
 }
 
 async function loadDashboard(): Promise<void> {
-  const queryString = new URLSearchParams({ period: elements.periodSelect.value });
-  summary = await get<DashboardSummary>(`/api/dashboard?${queryString}`);
+  const period = elements.periodSelect.value;
+  if (!isPeriod(period)) throw new Error("期間指定が不正です。");
+  const data = workoutData ?? { records: [], warnings: [] };
+  summary = buildDashboard(data.records, data.warnings, lastSyncedAt, period);
   renderDashboard(summary);
 }
 
@@ -502,42 +546,29 @@ function renderWarnings(data: DashboardSummary): void {
 
 async function resetSettings(): Promise<void> {
   if (!confirm("このMacに保存した取り込みデータを削除しますか？")) return;
-  await post("/api/reset", {});
-  bootstrapState.importedFile = null;
-  bootstrapState.hasData = false;
-  summary = null;
-  showEmptyState();
-  renderSourceState();
-  elements.settingsDialog.close();
-  showToast("取り込んだデータを削除しました。");
+  try {
+    await invoke("clear_import");
+    bootstrapState.importedFile = null;
+    bootstrapState.storageError = false;
+    workoutData = null;
+    lastSyncedAt = null;
+    summary = null;
+    showEmptyState();
+    renderSourceState();
+    setSettingsMessage("");
+    elements.settingsDialog.close();
+    showToast("取り込んだデータを削除しました。");
+  } catch (error) {
+    const message = messageFrom(error);
+    setSettingsMessage(message, true);
+    showToast(message, true);
+  }
 }
 
 function showEmptyState(): void {
   elements.dashboard.classList.add("hidden");
   elements.emptyState.classList.remove("hidden");
   elements.syncStatus.textContent = "未取り込み";
-}
-
-async function get<T>(path: string): Promise<T> {
-  return request<T>(path, { method: "GET" });
-}
-
-async function post<T = { ok: true }>(path: string, body: unknown): Promise<T> {
-  return request<T>(path, {
-    method: "POST",
-    headers: { "content-type": "application/json", "x-csrf-token": bootstrapState.csrfToken },
-    body: JSON.stringify(body),
-  });
-}
-
-async function request<T>(path: string, init: RequestInit): Promise<T> {
-  const response = await fetch(path, { ...init, credentials: "same-origin" });
-  const data = (await response.json()) as T | { error?: { message?: string } };
-  if (!response.ok) {
-    const errorData = data as { error?: { message?: string } };
-    throw new Error(errorData.error?.message ?? "リクエストに失敗しました。");
-  }
-  return data as T;
 }
 
 function setSettingsMessage(message: string, error = false): void {
@@ -618,6 +649,11 @@ function niceMax(value: number): number {
   return Math.ceil(value / magnitude) * magnitude;
 }
 
+function isPeriod(value: string): value is Period {
+  return value === "30" || value === "90" || value === "180" || value === "all";
+}
+
 function messageFrom(error: unknown): string {
-  return error instanceof Error ? error.message : "予期しないエラーが発生しました。";
+  if (error instanceof Error) return error.message;
+  return typeof error === "string" && error ? error : "予期しないエラーが発生しました。";
 }
